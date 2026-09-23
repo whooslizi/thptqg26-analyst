@@ -47,3 +47,7 @@ jupyter notebook THPTQG_2026_Nationwide_Score_Distribution_Analysis.ipynb
 ### GitHub Actions
 
 A GitHub Actions workflow (`.github/workflows/analyze.yml`) automatically runs whenever changes are pushed to `eoleun` (or another branch of your choice, if you’re handling the setup, as I assume you understand what I’m working on). It executes `run_analysis.py`, generates the updated Jupyter Notebook, and uploads the resulting charts and CSV reports as GitHub Actions artifacts.
+
+## Credits
+
+- **[anhdung98/diem_thi_2026](https://github.com/anhdung98/diem_thi_2026)** for providing the raw THPT 2026 examination score dataset.
