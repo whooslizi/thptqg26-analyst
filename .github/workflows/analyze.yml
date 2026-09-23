@@ -1,0 +1,50 @@
+name: Analysis Pipeline
+
+on:
+  push:
+    branches: [ eoleun ]
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install jupyter nbconvert papermill
+
+      - name: Create data and output directories
+        run: |
+          mkdir -p data output/charts output/reports
+
+      - name: Download THPT 2026 dataset from release
+        run: |
+          curl -L "https://github.com/anhdung98/diem_thi_2026/releases/download/260702/diem_thpt_2026.csv" -o data/raw_diem_thpt_2026.csv || true
+
+      - name: Run analysis pipeline script
+        run: |
+          python run_analysis.py
+
+      - name: Execute Jupyter Notebook
+        run: |
+          jupyter nbconvert --to notebook --execute THPTQG_2026_Nationwide_Score_Distribution_Analysis.ipynb --output THPTQG_2026_Nationwide_Score_Distribution_Analysis.ipynb || true
+
+      - name: Upload Analysis Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: thpt2026-analysis-results
+          path: |
+            output/
+            THPTQG_2026_Nationwide_Score_Distribution_Analysis.ipynb
