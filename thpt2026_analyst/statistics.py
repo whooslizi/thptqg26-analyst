@@ -4,6 +4,14 @@ import pandas as pd
 from scipy import stats
 from .data_cleaner import RAW_COLUMN_MAP, SUBJECT_DISPLAY_NAMES
 
+ADMISSION_BLOCKS: Dict[str, list] = {
+    "A00": ["toan", "vat_li", "hoa_hoc"],
+    "A01": ["toan", "vat_li", "ngoai_ngu"],
+    "B00": ["toan", "hoa_hoc", "sinh_hoc"],
+    "C00": ["ngu_van", "lich_su", "dia_li"],
+    "D01": ["toan", "ngu_van", "ngoai_ngu"],
+}
+
 
 def calculate_subject_statistics(df: pd.DataFrame) -> pd.DataFrame:
     subject_cols = [c for c in RAW_COLUMN_MAP.values() if c in df.columns]
@@ -65,14 +73,6 @@ def calculate_subject_statistics(df: pd.DataFrame) -> pd.DataFrame:
 def calculate_admission_blocks(
     df: pd.DataFrame,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    block_defs = {
-        "A00": ["toan", "vat_li", "hoa_hoc"],
-        "A01": ["toan", "vat_li", "ngoai_ngu"],
-        "B00": ["toan", "hoa_hoc", "sinh_hoc"],
-        "C00": ["ngu_van", "lich_su", "dia_li"],
-        "D01": ["toan", "ngu_van", "ngoai_ngu"],
-    }
-
     block_df = (
         df[["sbd", "province_name"]].copy()
         if "sbd" in df.columns
@@ -81,7 +81,7 @@ def calculate_admission_blocks(
 
     block_summaries = []
 
-    for block_code, subs in block_defs.items():
+    for block_code, subs in ADMISSION_BLOCKS.items():
         avail_subs = [s for s in subs if s in df.columns]
         if len(avail_subs) == 3:
             comp_df = df[avail_subs].dropna()
@@ -113,18 +113,9 @@ def calculate_admission_blocks(
 
 
 def find_valedictorians(df: pd.DataFrame) -> pd.DataFrame:
-    """Finds top scorers / valedictorians (Thủ khoa) per admission block and overall."""
-    block_defs = {
-        "A00": ["toan", "vat_li", "hoa_hoc"],
-        "A01": ["toan", "vat_li", "ngoai_ngu"],
-        "B00": ["toan", "hoa_hoc", "sinh_hoc"],
-        "C00": ["ngu_van", "lich_su", "dia_li"],
-        "D01": ["toan", "ngu_van", "ngoai_ngu"],
-    }
-
     results = []
 
-    for block, subs in block_defs.items():
+    for block, subs in ADMISSION_BLOCKS.items():
         avail = [s for s in subs if s in df.columns]
         if len(avail) == 3:
             sub_df = df.dropna(subset=avail).copy()
@@ -146,24 +137,77 @@ def find_valedictorians(df: pd.DataFrame) -> pd.DataFrame:
                         "details": scores_str,
                     })
 
-    # Overall sum valedictorian
-    subj_cols = [c for c in RAW_COLUMN_MAP.values() if c in df.columns]
-    if subj_cols:
-        sum_df = df.copy()
-        sum_df["overall_sum"] = sum_df[subj_cols].sum(axis=1, skipna=True)
-        max_sum = sum_df["overall_sum"].max()
-        top_overall = sum_df[sum_df["overall_sum"] == max_sum]
-
-        for _, row in top_overall.iterrows():
-            results.append({
-                "category": "Overall Top Candidate",
-                "sbd": row.get("sbd", "-"),
-                "province": row.get("province_name", "-"),
-                "total_score": round(row["overall_sum"], 2),
-                "details": f"Total across subjects taken",
-            })
-
     return pd.DataFrame(results)
+
+
+def get_regional_top_candidates(
+    df: pd.DataFrame, top_n: int = 5
+) -> pd.DataFrame:
+    if "region" not in df.columns:
+        return pd.DataFrame()
+
+    records = []
+    for region_name, r_df in df.groupby("region"):
+        for block_code, subs in ADMISSION_BLOCKS.items():
+            avail = [s for s in subs if s in r_df.columns]
+            if len(avail) == 3:
+                sub_df = r_df.dropna(subset=avail).copy()
+                if not sub_df.empty:
+                    sub_df["block_total"] = sub_df[avail].sum(axis=1)
+                    top_entries = sub_df.sort_values(
+                        by="block_total", ascending=False
+                    ).head(top_n)
+                    for _, row in top_entries.iterrows():
+                        records.append({
+                            "region": region_name,
+                            "block_code": block_code,
+                            "sbd": row.get("sbd", "-"),
+                            "province_name": row.get("province_name", "-"),
+                            "block_total": round(row["block_total"], 2),
+                            "details": ", ".join(
+                                [f"{s}: {row[s]:.2f}" for s in avail]
+                            ),
+                        })
+
+    return pd.DataFrame(records)
+
+
+def get_national_top_candidates(
+    df: pd.DataFrame, top_n: int = 100
+) -> pd.DataFrame:
+    """Calculates top candidates overall.
+
+    Requires candidates to have complete scores in compulsory subjects (toan, ngu_van)
+    and at least 2 electives to ensure fair evaluation without partial sum gaps.
+    """
+    subject_cols = [c for c in RAW_COLUMN_MAP.values() if c in df.columns]
+
+    # Only include candidates who completed all required subjects for their exam combination (4 subjects)
+    valid_mask = (
+        df[["toan", "ngu_van"]].notna().all(axis=1)
+        & (df[subject_cols].notna().sum(axis=1) >= 4)
+    )
+    filtered_df = df[valid_mask].copy()
+
+    if filtered_df.empty:
+        return pd.DataFrame()
+
+    filtered_df["total_score_sum"] = filtered_df[subject_cols].sum(
+        axis=1, skipna=True
+    )
+    top_df = filtered_df.sort_values(
+        by="total_score_sum", ascending=False
+    ).head(top_n)
+
+    output_cols = [
+        "sbd",
+        "province_name",
+        "region",
+        "total_score_sum",
+    ] + subject_cols
+    avail_cols = [c for c in output_cols if c in top_df.columns]
+
+    return top_df[avail_cols]
 
 
 def calculate_province_statistics(

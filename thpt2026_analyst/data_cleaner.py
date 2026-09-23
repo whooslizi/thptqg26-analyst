@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, Any
+from typing import Any, Dict, Tuple
 import numpy as np
 import pandas as pd
 
@@ -112,9 +112,29 @@ PROVINCE_MAP: Dict[str, str] = {
     "96": "Tỉnh Cà Mau",
 }
 
+NORTHERN_CODES = {
+    "01", "03", "04", "05", "06", "07", "08", "09", "10", "11",
+    "12", "13", "14", "15", "16", "17", "18", "19", "20", "21",
+    "22", "23", "24", "25", "26"
+}
+
+CENTRAL_CODES = {
+    "27", "28", "29", "30", "31", "32", "33", "34", "35", "36",
+    "37", "38", "39", "40", "41", "42", "43", "44", "45", "66", "68"
+}
+
 
 def get_province_mapping() -> Dict[str, str]:
     return PROVINCE_MAP.copy()
+
+
+def get_region_name(code: str) -> str:
+    if code in NORTHERN_CODES:
+        return "Miền Bắc"
+    elif code in CENTRAL_CODES:
+        return "Miền Trung"
+    else:
+        return "Miền Nam"
 
 
 def clean_thpt_2026_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
@@ -139,6 +159,7 @@ def clean_thpt_2026_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
         clean_df["province_name"] = (
             clean_df["province_code"].map(PROVINCE_MAP).fillna("Unknown")
         )
+        clean_df["region"] = clean_df["province_code"].apply(get_region_name)
     elif "province_code" in clean_df.columns:
         clean_df["province_code"] = (
             clean_df["province_code"].astype(str).str.zfill(2)
@@ -146,6 +167,7 @@ def clean_thpt_2026_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
         clean_df["province_name"] = (
             clean_df["province_code"].map(PROVINCE_MAP).fillna("Unknown")
         )
+        clean_df["region"] = clean_df["province_code"].apply(get_region_name)
 
     initial_count = len(clean_df)
     if "sbd" in clean_df.columns:

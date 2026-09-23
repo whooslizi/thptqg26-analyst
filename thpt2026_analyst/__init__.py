@@ -15,6 +15,8 @@ from .statistics import (
     calculate_subject_statistics,
     detect_score_outliers,
     find_valedictorians,
+    get_national_top_candidates,
+    get_regional_top_candidates,
 )
 
 __all__ = [
@@ -33,4 +35,6 @@ __all__ = [
     "calculate_subject_correlations",
     "detect_score_outliers",
     "find_valedictorians",
+    "get_regional_top_candidates",
+    "get_national_top_candidates",
 ]
