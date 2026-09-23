@@ -221,7 +221,7 @@ def plot_subject_grid_distributions(
     ]
 
     fig, axes = plt.subplots(3, 3, figsize=(15, 12), dpi=150)
-    fig.suptitle("Score Distribution of Subjects", fontsize=16, pad=20)
+    fig.suptitle("Score Distribution of Subjects", fontsize=16, y=0.98)
 
     for idx, subj in enumerate(subjects):
         row = idx // 3
