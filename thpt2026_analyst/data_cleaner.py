@@ -152,18 +152,24 @@ def clean_thpt_2026_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
 
     clean_df = df.copy()
     clean_df.rename(columns=RAW_COLUMN_MAP, inplace=True)
+    # Deduplicate column names if duplicates exist in raw headers
+    clean_df = clean_df.loc[:, ~clean_df.columns.duplicated()].copy()
 
     if "sbd" in clean_df.columns:
-        clean_df["sbd"] = clean_df["sbd"].astype(str).str.zfill(8)
+        sbd_series = clean_df["sbd"]
+        if isinstance(sbd_series, pd.DataFrame):
+            sbd_series = sbd_series.iloc[:, 0]
+        clean_df["sbd"] = sbd_series.astype(str).str.zfill(8)
         clean_df["province_code"] = clean_df["sbd"].str[:2]
         clean_df["province_name"] = (
             clean_df["province_code"].map(PROVINCE_MAP).fillna("Unknown")
         )
         clean_df["region"] = clean_df["province_code"].apply(get_region_name)
     elif "province_code" in clean_df.columns:
-        clean_df["province_code"] = (
-            clean_df["province_code"].astype(str).str.zfill(2)
-        )
+        prov_series = clean_df["province_code"]
+        if isinstance(prov_series, pd.DataFrame):
+            prov_series = prov_series.iloc[:, 0]
+        clean_df["province_code"] = prov_series.astype(str).str.zfill(2)
         clean_df["province_name"] = (
             clean_df["province_code"].map(PROVINCE_MAP).fillna("Unknown")
         )
@@ -178,10 +184,13 @@ def clean_thpt_2026_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]
     missing_rates = {}
 
     for col in subject_cols:
-        clean_df[col] = pd.to_numeric(clean_df[col], errors="coerce")
-        clean_df.loc[(clean_df[col] < 0.0) | (clean_df[col] > 10.0), col] = (
-            np.nan
-        )
+        target_series = clean_df[col]
+        if isinstance(target_series, pd.DataFrame):
+            target_series = target_series.iloc[:, 0]
+        num_series = pd.to_numeric(target_series, errors="coerce")
+        num_series.loc[(num_series < 0.0) | (num_series > 10.0)] = np.nan
+        clean_df[col] = num_series
+
         missing_count = int(clean_df[col].isna().sum())
         missing_rates[col] = {
             "subject_name": SUBJECT_DISPLAY_NAMES.get(col, col),
